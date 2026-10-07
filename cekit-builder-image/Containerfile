@@ -1,0 +1,34 @@
+FROM registry.access.redhat.com/ubi10-minimal
+
+ARG USER_HOME_DIR="/home/user"
+
+ENV HOME=${USER_HOME_DIR}
+ENV BUILDAH_ISOLATION=chroot
+
+COPY --chown=0:0 entrypoint.sh /
+
+RUN microdnf --disableplugin=subscription-manager install -y openssl git tar shadow-utils bash podman python3-pip python3-devel fuse-overlayfs util-linux; \
+    microdnf update -y ; \
+    microdnf clean all ; \
+    mkdir -p ${USER_HOME_DIR} ; \
+    chgrp -R 0 /home ; \
+    # Install YQ
+    TEMP_DIR="$(mktemp -d)" ; \ 
+    YQ_VER=$(basename $(curl -Ls -o /dev/null -w %{url_effective} https://github.com/mikefarah/yq/releases/latest)) ; \
+    curl -fsSL -o ${TEMP_DIR}/yq.tar.gz https://github.com/mikefarah/yq/releases/download/${YQ_VER}/yq_linux_amd64.tar.gz ; \
+    tar -xzf ${TEMP_DIR}/yq.tar.gz -C ${TEMP_DIR} ; \
+    cp ${TEMP_DIR}/yq_linux_amd64 /usr/local/bin/yq ; \
+    chmod +x /usr/local/bin/yq ; \
+    rm -rf "${TEMP_DIR}" ; \
+    #
+    # Setup for root-less podman
+    #
+    setcap cap_setuid+ep /usr/bin/newuidmap ; \
+    setcap cap_setgid+ep /usr/bin/newgidmap ; \
+    touch /etc/subgid /etc/subuid ; \
+    pip install -U cekit ; \
+    chmod +x /entrypoint.sh ; \
+    chmod -R g=u /etc/passwd /etc/group /etc/subuid /etc/subgid /home
+
+WORKDIR ${USER_HOME_DIR}
+ENTRYPOINT [ "/entrypoint.sh" ]
