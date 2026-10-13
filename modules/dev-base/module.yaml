@@ -32,7 +32,6 @@ packages:
   - vim-minimal
   - vim-enhanced
   - pinentry
-  - helm
 execute:
 - script: install.sh
 envs:
